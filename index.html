@@ -50,6 +50,7 @@
         
         .hidden { display: none; }
         .logout-btn { background: var(--danger-color); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-family: 'Cairo'; font-weight: 600; }
+        .divider { border-top: 1px solid var(--border-color); margin: 30px 0; }
     </style>
 </head>
 <body>
@@ -76,7 +77,7 @@
 
     <div class="auth-box hidden" id="clientLoginBox">
         <h3>🔐 بوابة العميل</h3>
-        <input type="text" id="clientCodeInput" class="auth-input" placeholder="كود العميل (مثال: Flux)">
+        <input type="text" id="clientCodeInput" class="auth-input" placeholder="كود العميل (مثال: menren)">
         <input type="password" id="clientPassInput" class="auth-input" placeholder="كلمة المرور">
         <button class="btn" onclick="clientLogin()">دخول لوحة التحكم</button>
         <div class="error-msg" id="clientLoginError">بيانات الدخول غير صحيحة</div>
@@ -87,15 +88,17 @@
     <div class="auth-box hidden" id="adminLoginBox">
         <h3>⚙️ بوابة الإدارة</h3>
         <input type="password" id="adminPinInput" class="auth-input" placeholder="رمز المدير (PIN)">
-        <button class="btn" onclick="adminLogin()">دخول لوحة الرفع</button>
+        <button class="btn" onclick="adminLogin()">دخول لوحة التحكم</button>
         <div class="error-msg" id="adminLoginError">رمز غير صحيح</div>
         <br><br>
         <button class="nav-btn" onclick="backToRole()">رجوع</button>
     </div>
 
     <div class="hidden" id="adminDashboard">
-        <h2 style="text-align: center; margin-bottom: 20px;">رفع بيانات حملة جديدة</h2>
+        <h2 style="text-align: center; margin-bottom: 20px;">لوحة الإدارة</h2>
+        
         <div class="upload-area">
+            <h3>رفع بيانات حملة جديدة</h3>
             <div class="form-group">
                 <label>كود العميل (يجب أن يكون مطابقاً لاسم الورقة في الشيت)</label>
                 <input type="text" id="adminClientCode" placeholder="مثال: menren">
@@ -107,10 +110,19 @@
             <button class="btn btn-success" id="uploadBtn" onclick="processCSV()">تحليل ورفع البيانات</button>
             <div id="uploadStatus" style="margin-top: 15px; font-weight: bold;"></div>
         </div>
+
+        <div class="divider"></div>
+
+        <div style="text-align: center;">
+            <h3>أو اعرض تقرير عميل كمسؤول</h3>
+            <input type="text" id="adminViewClientCode" class="auth-input" placeholder="اكتب كود العميل" style="max-width: 300px; margin: 0 auto 10px auto;">
+            <button class="btn" style="max-width: 300px; margin: 0 auto;" onclick="adminViewReport()">عرض التقرير</button>
+        </div>
     </div>
 
     <div class="hidden" id="clientDashboard">
-        <h2 id="clientWelcome" style="text-align: center; margin-bottom: 30px;"></h2>
+        <h2 id="clientWelcome" style="text-align: center; margin-bottom: 10px;"></h2>
+        <div id="reportPeriod" style="text-align: center; font-size: 16px; font-weight: 600; color: var(--primary-color); margin-bottom: 30px;"></div>
         
         <div class="kpi-grid">
             <div class="kpi-card"><h4>إجمالي الإنفاق (EGP)</h4><div class="value" id="kpiSpend">0</div></div>
@@ -132,7 +144,7 @@
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbzBJLX64VPqHmg4CrHUWg_sjN6W0kMbdqEPLL6j00Hsy34NuY0x5F6X9eL5zHFGNxQ/exec"; 
+    const API_URL = "https://script.google.com/macros/s/AKfycbyD1JvYxuj0__GXNgdj4cKXEhISA1hPePPIiyp9wtQ2OqWat6gQt_Z7gdCy3zQrees/exec"; 
     let currentClient = null;
     let performanceChart = null;
     let engagementChart = null;
@@ -156,7 +168,6 @@
         const code = document.getElementById('clientCodeInput').value;
         const pass = document.getElementById('clientPassInput').value;
         document.getElementById('clientLoginError').style.display = 'none';
-        
         try {
             const res = await fetch(`${API_URL}?action=clientLogin&clientCode=${code}&password=${pass}&t=${Date.now()}`);
             const data = await res.json();
@@ -178,7 +189,7 @@
             const res = await fetch(`${API_URL}?action=verifyAdminPin&pin=${pin}&t=${Date.now()}`);
             const result = await res.json();
             if (result.verified) {
-                window.adminPin = pin; // حفظ مؤقت في الذاكرة فقط
+                window.adminPin = pin;
                 document.getElementById('adminLoginBox').classList.add('hidden');
                 document.getElementById('logoutBtn').classList.remove('hidden');
                 document.getElementById('adminDashboard').classList.remove('hidden');
@@ -186,6 +197,13 @@
                 document.getElementById('adminLoginError').style.display = 'block';
             }
         } catch (e) { document.getElementById('adminLoginError').style.display = 'block'; }
+    }
+
+    async function adminViewReport() {
+        const code = document.getElementById('adminViewClientCode').value;
+        if (!code) { alert("اكتب كود العميل"); return; }
+        currentClient = { code: code, pass: window.adminPin, name: code, data: [] };
+        await loadClientData(true);
     }
 
     function logout() {
@@ -196,28 +214,41 @@
         backToRole();
     }
 
-    async function loadClientData() {
+    async function loadClientData(isAdmin = false) {
         try {
             const res = await fetch(`${API_URL}?action=getClientData&clientCode=${currentClient.code}&password=${currentClient.pass}&t=${Date.now()}`);
             const data = await res.json();
             if (data.status === 'success') {
                 currentClient.data = data.data;
-                document.getElementById('clientWelcome').innerText = `لوحة تحليلات: ${data.clientName}`;
+                document.getElementById('clientWelcome').innerText = `لوحة تحليلات: ${data.clientName} ${isAdmin ? '(وضع المسؤول)' : ''}`;
+                
+                if (data.data.length > 0) {
+                    let dates = data.data.map(r => r["Date"]).filter(d => d && d !== "N/A");
+                    if (dates.length > 0) {
+                        document.getElementById('reportPeriod').innerText = `📅 فترة التقرير: ${dates[0]} إلى ${dates[dates.length - 1]}`;
+                    } else {
+                        document.getElementById('reportPeriod').innerText = `📅 فترة التقرير: غير محدد`;
+                    }
+                } else {
+                    document.getElementById('reportPeriod').innerText = `لا توجد بيانات متاحة لهذا العميل`;
+                }
+
+                document.getElementById('adminDashboard').classList.add('hidden');
+                document.getElementById('clientLoginBox').classList.add('hidden');
                 document.getElementById('clientDashboard').classList.remove('hidden');
+                
                 updateKPIs(data.data);
                 renderCharts(data.data);
             } else {
-                alert("لا توجد بيانات متاحة حالياً");
+                alert("لا توجد بيانات متاحة أو كود العميل غير صحيح");
             }
         } catch (e) { alert("خطأ في جلب البيانات"); }
     }
 
     function updateKPIs(data) {
         const sum = (key) => data.reduce((acc, row) => acc + (parseFloat(row[key]) || 0), 0);
-        
         const totalSpend = sum("Amount spent (EGP)");
         const totalMessages = sum("Messaging conversations started");
-        
         document.getElementById('kpiSpend').innerText = totalSpend.toFixed(2);
         document.getElementById('kpiReach').innerText = sum("Reach").toLocaleString();
         document.getElementById('kpiImpressions').innerText = sum("Impressions").toLocaleString();
@@ -285,10 +316,7 @@
         const clientCode = document.getElementById('adminClientCode').value;
         const statusDiv = document.getElementById('uploadStatus');
 
-        if (!fileInput.files[0] || !clientCode) {
-            alert("يرجى اختيار العميل وملف الـ CSV أولاً.");
-            return;
-        }
+        if (!fileInput.files[0] || !clientCode) { alert("يرجى اختيار العميل وملف الـ CSV أولاً."); return; }
 
         const file = fileInput.files[0];
         statusDiv.innerText = "جاري تحليل الملف... ⏳";
@@ -297,7 +325,6 @@
         Papa.parse(file, {
             skipEmptyLines: true,
             complete: function(results) {
-                // البحث عن صف العناوين الحقيقي (الذي يحتوي على Amount spent و Impressions)
                 let headerRowIndex = -1;
                 let headers = [];
                 for (let i = 0; i < results.data.length; i++) {
@@ -311,21 +338,19 @@
 
                 if (headerRowIndex === -1) {
                     statusDiv.innerText = "❌ لم يتم العثور على أعمدة الإعلانات. تأكد أن الملف من فيسبوك أدز.";
-                    statusDiv.style.color = "var(--danger-color)";
-                    return;
+                    statusDiv.style.color = "var(--danger-color)"; return;
                 }
 
                 let cleanData = [];
                 for (let i = headerRowIndex + 1; i < results.data.length; i++) {
                     let row = results.data[i];
-                    if (!row[0] || row[0].toLowerCase().includes("total")) continue; // تجاهل صف الإجمالي
+                    if (!row[0] || row[0].toLowerCase().includes("total")) continue;
                     
                     let rowObj = {};
                     for (let j = 0; j < headers.length; j++) {
                         rowObj[headers[j]] = row[j] !== undefined ? String(row[j]).replace(/,/g, '') : "0";
                     }
 
-                    // مطابقة الأعمدة بمرونة (لو فيها اختلاف بسيط)
                     let mappedRow = {};
                     mappedRow["Date"] = rowObj["Date"] || rowObj["Reporting starts"] || "N/A";
                     mappedRow["Amount spent (EGP)"] = rowObj["Amount spent (EGP)"] || rowObj["Amount spent"] || "0";
@@ -348,8 +373,7 @@
 
                 if (cleanData.length === 0) {
                     statusDiv.innerText = "❌ الملف لا يحتوي على بيانات أيام. تأكد أنك تصدر التقرير (By Day).";
-                    statusDiv.style.color = "var(--danger-color)";
-                    return;
+                    statusDiv.style.color = "var(--danger-color)"; return;
                 }
 
                 uploadToSheet(clientCode, cleanData);
@@ -364,20 +388,13 @@
     async function uploadToSheet(clientCode, rows) {
         const statusDiv = document.getElementById('uploadStatus');
         const btn = document.getElementById('uploadBtn');
-        btn.disabled = true;
-        btn.innerText = "جاري الرفع...";
+        btn.disabled = true; btn.innerText = "جاري الرفع...";
 
-        const payload = {
-            action: 'uploadData',
-            pin: window.adminPin, 
-            clientCode: clientCode,
-            rows: rows
-        };
+        const payload = { action: 'uploadData', pin: window.adminPin, clientCode: clientCode, rows: rows };
 
         try {
             await fetch(API_URL, {
-                method: 'POST',
-                mode: 'no-cors',
+                method: 'POST', mode: 'no-cors',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(payload)
             });
@@ -385,13 +402,11 @@
             statusDiv.innerText = "✅ تم رفع وتحديث البيانات بنجاح!";
             statusDiv.style.color = "var(--success-color)";
             document.getElementById('csvFileInput').value = "";
-            btn.disabled = false;
-            btn.innerText = "تحليل ورفع البيانات";
+            btn.disabled = false; btn.innerText = "تحليل ورفع البيانات";
         } catch (e) {
             statusDiv.innerText = "❌ خطأ في الاتصال بالخادم.";
             statusDiv.style.color = "var(--danger-color)";
-            btn.disabled = false;
-            btn.innerText = "تحليل ورفع البيانات";
+            btn.disabled = false; btn.innerText = "تحليل ورفع البيانات";
         }
     }
 </script>
