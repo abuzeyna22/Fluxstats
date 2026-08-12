@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flux Analytics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #f8fafc; --container-bg: #ffffff; --text-color: #1e293b;
+            --header-color: #0f172a; --border-color: #e2e8f0; --primary-color: #6366f1;
+            --danger-color: #ef4444; --success-color: #10b981; --warning-color: #f59e0b;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .dark-mode {
+            --bg-color: #0f172a; --container-bg: #1e293b; --text-color: #cbd5e0;
+            --header-color: #f1f5f9; --border-color: #334155; --primary-color: #818cf8;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+        body { font-family: 'Cairo', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; transition: 0.4s; }
+
+        .navbar { background: var(--container-bg); box-shadow: var(--shadow); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
+        .brand-name { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 800; color: var(--header-color); }
+        .nav-btn { padding: 8px 12px; border-radius: 8px; font-weight: 600; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); cursor: pointer; font-size: 14px; font-family: 'Cairo'; }
+
+        .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
+        
+        .auth-box { background: var(--container-bg); padding: 30px; border-radius: 12px; box-shadow: var(--shadow); max-width: 400px; margin: 50px auto; text-align: center; }
+        .auth-input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); color: var(--text-color); box-sizing: border-box; font-family: 'Cairo'; text-align: center; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 15px; font-family: 'Cairo'; background: var(--primary-color); color: white; transition: 0.2s; }
+        .btn:hover { opacity: 0.9; }
+        .btn-danger { background: var(--danger-color); }
+        .btn-success { background: var(--success-color); }
+        .error-msg { color: var(--danger-color); font-size: 13px; margin-top: 10px; display: none; }
+
+        .upload-area { border: 2px dashed var(--border-color); padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 20px; background: var(--container-bg); }
+        .upload-area input[type="file"] { margin-top: 15px; }
+        .form-group { margin-bottom: 15px; text-align: right; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; }
+        .form-group select, .form-group input { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); color: var(--text-color); box-sizing: border-box; font-family: 'Cairo'; }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; }
+        .kpi-card { background: var(--container-bg); padding: 20px; border-radius: 12px; box-shadow: var(--shadow); text-align: center; border-top: 4px solid var(--primary-color); }
+        .kpi-card h4 { margin: 0 0 10px 0; font-size: 14px; opacity: 0.8; }
+        .kpi-card .value { font-size: 24px; font-weight: 800; color: var(--primary-color); }
+
+        .chart-container { background: var(--container-bg); padding: 20px; border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 30px; height: 400px; position: relative; }
+        
+        .hidden { display: none; }
+        .logout-btn { background: var(--danger-color); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-family: 'Cairo'; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <div class="brand-name">
+        📊 Flux Analytics
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <button class="nav-btn" onclick="toggleDarkMode()">🌙 وضع ليلي</button>
+        <button class="logout-btn hidden" id="logoutBtn" onclick="logout()">خروج</button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="auth-box" id="roleSelector">
+        <h3>مرحباً بك في Flux Analytics</h3>
+        <p>اختر نوع الحساب للمتابعة</p>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn" onclick="showClientLogin()">دخول العميل</button>
+            <button class="btn btn-success" onclick="showAdminLogin()">دخول الإدارة</button>
+        </div>
+    </div>
+
+    <div class="auth-box hidden" id="clientLoginBox">
+        <h3>🔐 بوابة العميل</h3>
+        <input type="text" id="clientCodeInput" class="auth-input" placeholder="كود العميل (مثال: menren)">
+        <input type="password" id="clientPassInput" class="auth-input" placeholder="كلمة المرور">
+        <button class="btn" onclick="clientLogin()">دخول لوحة التحكم</button>
+        <div class="error-msg" id="clientLoginError">بيانات الدخول غير صحيحة</div>
+        <br><br>
+        <button class="nav-btn" onclick="backToRole()">رجوع</button>
+    </div>
+
+    <div class="auth-box hidden" id="adminLoginBox">
+        <h3>⚙️ بوابة الإدارة</h3>
+        <input type="password" id="adminPinInput" class="auth-input" placeholder="رمز المدير (PIN)">
+        <button class="btn" onclick="adminLogin()">دخول لوحة الرفع</button>
+        <div class="error-msg" id="adminLoginError">رمز غير صحيح</div>
+        <br><br>
+        <button class="nav-btn" onclick="backToRole()">رجوع</button>
+    </div>
+
+    <div class="hidden" id="adminDashboard">
+        <h2 style="text-align: center; margin-bottom: 20px;">رفع بيانات حملة جديدة</h2>
+        <div class="upload-area">
+            <div class="form-group">
+                <label>كود العميل (يجب أن يكون مطابقاً لاسم الورقة في الشيت)</label>
+                <input type="text" id="adminClientCode" placeholder="مثال: menren">
+            </div>
+            <div class="form-group">
+                <label>اختر ملف CSV (من فيسبوك أدز)</label>
+                <input type="file" id="csvFileInput" accept=".csv">
+            </div>
+            <button class="btn btn-success" id="uploadBtn" onclick="processCSV()">تحليل ورفع البيانات</button>
+            <div id="uploadStatus" style="margin-top: 15px; font-weight: bold;"></div>
+        </div>
+    </div>
+
+    <div class="hidden" id="clientDashboard">
+        <h2 id="clientWelcome" style="text-align: center; margin-bottom: 30px;"></h2>
+        
+        <div class="kpi-grid">
+            <div class="kpi-card"><h4>إجمالي الإنفاق (EGP)</h4><div class="value" id="kpiSpend">0</div></div>
+            <div class="kpi-card"><h4>إجمالي الوصول (Reach)</h4><div class="value" id="kpiReach">0</div></div>
+            <div class="kpi-card"><h4>إجمالي الظهور (Impressions)</h4><div class="value" id="kpiImpressions">0</div></div>
+            <div class="kpi-card"><h4>تفاعلات (Engagements)</h4><div class="value" id="kpiEngagements">0</div></div>
+            <div class="kpi-card"><h4>محادثات بدأت (Messages)</h4><div class="value" id="kpiMessages">0</div></div>
+            <div class="kpi-card"><h4>تكلفة المحادثة (EGP)</h4><div class="value" id="kpiCostPerMsg">0</div></div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="performanceChart"></canvas>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="engagementChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbywVs2AmpN5WziZ4BfiqK8AtRlHOtL_3P9Y85Z3apXkdukYEq1MTqnmvhyBniiWB_4/exec"; 
+    let currentClient = null;
+    let performanceChart = null;
+    let engagementChart = null;
+
+    function toggleDarkMode() {
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('darkModeAnalytics', document.body.classList.contains('dark-mode'));
+        if(currentClient) renderCharts(currentClient.data);
+    }
+    if (localStorage.getItem('darkModeAnalytics') === 'true') document.body.classList.add('dark-mode');
+
+    function showClientLogin() { document.getElementById('roleSelector').classList.add('hidden'); document.getElementById('clientLoginBox').classList.remove('hidden'); }
+    function showAdminLogin() { document.getElementById('roleSelector').classList.add('hidden'); document.getElementById('adminLoginBox').classList.remove('hidden'); }
+    function backToRole() { 
+        document.getElementById('clientLoginBox').classList.add('hidden'); 
+        document.getElementById('adminLoginBox').classList.add('hidden'); 
+        document.getElementById('roleSelector').classList.remove('hidden'); 
+    }
+
+    async function clientLogin() {
+        const code = document.getElementById('clientCodeInput').value;
+        const pass = document.getElementById('clientPassInput').value;
+        document.getElementById('clientLoginError').style.display = 'none';
+        
+        try {
+            const res = await fetch(`${API_URL}?action=clientLogin&clientCode=${code}&password=${pass}&t=${Date.now()}`);
+            const data = await res.json();
+            if (data.status === 'success') {
+                currentClient = { code: code, pass: pass, name: data.clientName, data: [] };
+                document.getElementById('clientLoginBox').classList.add('hidden');
+                document.getElementById('logoutBtn').classList.remove('hidden');
+                loadClientData();
+            } else {
+                document.getElementById('clientLoginError').style.display = 'block';
+            }
+        } catch (e) { document.getElementById('clientLoginError').style.display = 'block'; }
+    }
+
+    function adminLogin() {
+        const pin = document.getElementById('adminPinInput').value;
+        if (pin === '1234') { 
+            document.getElementById('adminLoginBox').classList.add('hidden');
+            document.getElementById('logoutBtn').classList.remove('hidden');
+            document.getElementById('adminDashboard').classList.remove('hidden');
+        } else {
+            document.getElementById('adminLoginError').style.display = 'block';
+        }
+    }
+
+    function logout() {
+        currentClient = null;
+        document.getElementById('clientDashboard').classList.add('hidden');
+        document.getElementById('adminDashboard').classList.add('hidden');
+        document.getElementById('logoutBtn').classList.add('hidden');
+        backToRole();
+    }
+
+    async function loadClientData() {
+        try {
+            const res = await fetch(`${API_URL}?action=getClientData&clientCode=${currentClient.code}&password=${currentClient.pass}&t=${Date.now()}`);
+            const data = await res.json();
+            if (data.status === 'success') {
+                currentClient.data = data.data;
+                document.getElementById('clientWelcome').innerText = `لوحة تحليلات: ${data.clientName}`;
+                document.getElementById('clientDashboard').classList.remove('hidden');
+                updateKPIs(data.data);
+                renderCharts(data.data);
+            } else {
+                alert("لا توجد بيانات متاحة حالياً");
+            }
+        } catch (e) { alert("خطأ في جلب البيانات"); }
+    }
+
+    function updateKPIs(data) {
+        const sum = (key) => data.reduce((acc, row) => acc + (parseFloat(row[key]) || 0), 0);
+        
+        const totalSpend = sum("Amount spent (EGP)");
+        const totalMessages = sum("Messaging conversations started");
+        
+        document.getElementById('kpiSpend').innerText = totalSpend.toFixed(2);
+        document.getElementById('kpiReach').innerText = sum("Reach").toLocaleString();
+        document.getElementById('kpiImpressions').innerText = sum("Impressions").toLocaleString();
+        document.getElementById('kpiEngagements').innerText = sum("Post engagements").toLocaleString();
+        document.getElementById('kpiMessages').innerText = totalMessages.toLocaleString();
+        document.getElementById('kpiCostPerMsg').innerText = totalMessages > 0 ? (totalSpend / totalMessages).toFixed(2) : '0';
+    }
+
+    function renderCharts(data) {
+        const labels = data.map(r => r["Date"] || "N/A");
+        const spendData = data.map(r => parseFloat(r["Amount spent (EGP)"]) || 0);
+        const reachData = data.map(r => parseFloat(r["Reach"]) || 0);
+        const engData = data.map(r => parseFloat(r["Post engagements"]) || 0);
+        const msgData = data.map(r => parseFloat(r["Messaging conversations started"]) || 0);
+
+        const textColor = document.body.classList.contains('dark-mode') ? '#cbd5e0' : '#1e293b';
+        const gridColor = document.body.classList.contains('dark-mode') ? '#334155' : '#e2e8f0';
+
+        const ctx1 = document.getElementById('performanceChart').getContext('2d');
+        if (performanceChart) performanceChart.destroy();
+        performanceChart = new Chart(ctx1, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'الإنفاق (EGP)', data: spendData, borderColor: '#6366f1', backgroundColor: 'rgba(99, 102, 241, 0.1)', yAxisID: 'y', tension: 0.3, fill: true },
+                    { label: 'الوصول (Reach)', data: reachData, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', yAxisID: 'y1', tension: 0.3, fill: true }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { title: { display: true, text: 'الأداء العام (الإنفاق مقابل الوصول)', color: textColor }, legend: { labels: { color: textColor } } },
+                scales: {
+                    x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                    y: { type: 'linear', position: 'left', title: { display: true, text: 'الإنفاق', color: textColor }, ticks: { color: textColor }, grid: { color: gridColor } },
+                    y1: { type: 'linear', position: 'right', title: { display: true, text: 'الوصول', color: textColor }, ticks: { color: textColor }, grid: { drawOnChartArea: false } }
+                }
+            }
+        });
+
+        const ctx2 = document.getElementById('engagementChart').getContext('2d');
+        if (engagementChart) engagementChart.destroy();
+        engagementChart = new Chart(ctx2, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'التفاعلات', data: engData, backgroundColor: 'rgba(245, 158, 11, 0.5)', borderColor: '#f59e0b', borderWidth: 1 },
+                    { label: 'المحادثات', data: msgData, backgroundColor: 'rgba(239, 68, 68, 0.5)', borderColor: '#ef4444', borderWidth: 1 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { title: { display: true, text: 'التفاعلات والمحادثات', color: textColor }, legend: { labels: { color: textColor } } },
+                scales: {
+                    x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                    y: { ticks: { color: textColor }, grid: { color: gridColor } }
+                }
+            }
+        });
+    }
+
+    function processCSV() {
+        const fileInput = document.getElementById('csvFileInput');
+        const clientCode = document.getElementById('adminClientCode').value;
+        const statusDiv = document.getElementById('uploadStatus');
+
+        if (!fileInput.files[0] || !clientCode) {
+            alert("يرجى اختيار العميل وملف الـ CSV أولاً.");
+            return;
+        }
+
+        const file = fileInput.files[0];
+        statusDiv.innerText = "جاري تحليل الملف... ⏳";
+        statusDiv.style.color = "var(--primary-color)";
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                const requiredHeaders = ["Date", "Amount spent (EGP)", "Impressions", "Reach", "Video plays", "Photo clicks", "Post saves", "Post reactions", "Post engagements", "Post comments", "Post shares", "Messaging conversations started", "Cost per messaging conversation started (EGP)", "Facebook likes", "Instagram follows"];
+                
+                let cleanData = [];
+                results.data.forEach(row => {
+                    let newRow = {};
+                    Object.keys(row).forEach(key => {
+                        let cleanKey = key.trim();
+                        newRow[cleanKey] = row[key];
+                    });
+                    if (newRow["Date"] && newRow["Date"] !== "Total") {
+                        let mappedRow = {};
+                        requiredHeaders.forEach(h => {
+                            mappedRow[h] = newRow[h] !== undefined ? newRow[h].replace(/,/g, '') : "";
+                        });
+                        cleanData.push(mappedRow);
+                    }
+                });
+
+                if (cleanData.length === 0) {
+                    statusDiv.innerText = "لم يتم العثور على بيانات صحيحة. تأكد أن الملف من فيسبوك أدز.";
+                    statusDiv.style.color = "var(--danger-color)";
+                    return;
+                }
+
+                uploadToSheet(clientCode, cleanData);
+            },
+            error: function(error) {
+                statusDiv.innerText = "خطأ في قراءة الملف: " + error.message;
+                statusDiv.style.color = "var(--danger-color)";
+            }
+        });
+    }
+
+    async function uploadToSheet(clientCode, rows) {
+        const statusDiv = document.getElementById('uploadStatus');
+        const btn = document.getElementById('uploadBtn');
+        btn.disabled = true;
+        btn.innerText = "جاري الرفع...";
+
+        const payload = {
+            action: 'uploadData',
+            pin: '1234', 
+            clientCode: clientCode,
+            rows: rows
+        };
+
+        try {
+            await fetch(API_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            });
+            
+            statusDiv.innerText = "✅ تم رفع وتحديث البيانات بنجاح!";
+            statusDiv.style.color = "var(--success-color)";
+            document.getElementById('csvFileInput').value = "";
+            btn.disabled = false;
+            btn.innerText = "تحليل ورفع البيانات";
+        } catch (e) {
+            statusDiv.innerText = "❌ خطأ في الاتصال بالخادم.";
+            statusDiv.style.color = "var(--danger-color)";
+            btn.disabled = false;
+            btn.innerText = "تحليل ورفع البيانات";
+        }
+    }
+</script>
+
+</body>
+</html>
