@@ -132,7 +132,7 @@
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbywVs2AmpN5WziZ4BfiqK8AtRlHOtL_3P9Y85Z3apXkdukYEq1MTqnmvhyBniiWB_4/exec"; 
+    const API_URL = "https://script.google.com/macros/s/AKfycbyecEP45cRzyGu5nyxAWQJqdexYGsqxuuq1Vt3ynqp_GOgKE3wwY2vduwjHGZoj-P4/exec"; 
     let currentClient = null;
     let performanceChart = null;
     let engagementChart = null;
@@ -171,15 +171,21 @@
         } catch (e) { document.getElementById('clientLoginError').style.display = 'block'; }
     }
 
-    function adminLogin() {
+        async function adminLogin() {
         const pin = document.getElementById('adminPinInput').value;
-        if (pin === '1234') { 
-            document.getElementById('adminLoginBox').classList.add('hidden');
-            document.getElementById('logoutBtn').classList.remove('hidden');
-            document.getElementById('adminDashboard').classList.remove('hidden');
-        } else {
-            document.getElementById('adminLoginError').style.display = 'block';
-        }
+        document.getElementById('adminLoginError').style.display = 'none';
+        try {
+            const res = await fetch(`${API_URL}?action=verifyAdminPin&pin=${pin}&t=${Date.now()}`);
+            const result = await res.json();
+            if (result.verified) {
+                window.adminPin = pin; // حفظ مؤقت في الذاكرة فقط
+                document.getElementById('adminLoginBox').classList.add('hidden');
+                document.getElementById('logoutBtn').classList.remove('hidden');
+                document.getElementById('adminDashboard').classList.remove('hidden');
+            } else {
+                document.getElementById('adminLoginError').style.display = 'block';
+            }
+        } catch (e) { document.getElementById('adminLoginError').style.display = 'block'; }
     }
 
     function logout() {
@@ -333,7 +339,7 @@
 
         const payload = {
             action: 'uploadData',
-            pin: '1234', 
+                        pin: window.adminPin,
             clientCode: clientCode,
             rows: rows
         };
