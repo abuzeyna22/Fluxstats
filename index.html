@@ -295,29 +295,59 @@
         statusDiv.style.color = "var(--primary-color)";
 
         Papa.parse(file, {
-            header: true,
             skipEmptyLines: true,
             complete: function(results) {
-                const requiredHeaders = ["Date", "Amount spent (EGP)", "Impressions", "Reach", "Video plays", "Photo clicks", "Post saves", "Post reactions", "Post engagements", "Post comments", "Post shares", "Messaging conversations started", "Cost per messaging conversation started (EGP)", "Facebook likes", "Instagram follows"];
-                
-                let cleanData = [];
-                results.data.forEach(row => {
-                    let newRow = {};
-                    Object.keys(row).forEach(key => {
-                        let cleanKey = key.trim();
-                        newRow[cleanKey] = row[key];
-                    });
-                    if (newRow["Date"] && newRow["Date"] !== "Total") {
-                        let mappedRow = {};
-                        requiredHeaders.forEach(h => {
-                            mappedRow[h] = newRow[h] !== undefined ? newRow[h].replace(/,/g, '') : "";
-                        });
-                        cleanData.push(mappedRow);
+                // البحث عن صف العناوين الحقيقي (الذي يحتوي على Amount spent و Impressions)
+                let headerRowIndex = -1;
+                let headers = [];
+                for (let i = 0; i < results.data.length; i++) {
+                    let rowStr = results.data[i].join(" ").toLowerCase();
+                    if (rowStr.includes("amount spent") && rowStr.includes("impressions")) {
+                        headerRowIndex = i;
+                        headers = results.data[i].map(h => h ? h.trim() : "");
+                        break;
                     }
-                });
+                }
+
+                if (headerRowIndex === -1) {
+                    statusDiv.innerText = "❌ لم يتم العثور على أعمدة الإعلانات. تأكد أن الملف من فيسبوك أدز.";
+                    statusDiv.style.color = "var(--danger-color)";
+                    return;
+                }
+
+                let cleanData = [];
+                for (let i = headerRowIndex + 1; i < results.data.length; i++) {
+                    let row = results.data[i];
+                    if (!row[0] || row[0].toLowerCase().includes("total")) continue; // تجاهل صف الإجمالي
+                    
+                    let rowObj = {};
+                    for (let j = 0; j < headers.length; j++) {
+                        rowObj[headers[j]] = row[j] !== undefined ? String(row[j]).replace(/,/g, '') : "0";
+                    }
+
+                    // مطابقة الأعمدة بمرونة (لو فيها اختلاف بسيط)
+                    let mappedRow = {};
+                    mappedRow["Date"] = rowObj["Date"] || rowObj["Reporting starts"] || "N/A";
+                    mappedRow["Amount spent (EGP)"] = rowObj["Amount spent (EGP)"] || rowObj["Amount spent"] || "0";
+                    mappedRow["Impressions"] = rowObj["Impressions"] || "0";
+                    mappedRow["Reach"] = rowObj["Reach"] || "0";
+                    mappedRow["Video plays"] = rowObj["Video plays"] || "0";
+                    mappedRow["Photo clicks"] = rowObj["Photo clicks"] || "0";
+                    mappedRow["Post saves"] = rowObj["Post saves"] || "0";
+                    mappedRow["Post reactions"] = rowObj["Post reactions"] || "0";
+                    mappedRow["Post engagements"] = rowObj["Post engagements"] || "0";
+                    mappedRow["Post comments"] = rowObj["Post comments"] || "0";
+                    mappedRow["Post shares"] = rowObj["Post shares"] || "0";
+                    mappedRow["Messaging conversations started"] = rowObj["Messaging conversations started"] || "0";
+                    mappedRow["Cost per messaging conversation started (EGP)"] = rowObj["Cost per messaging conversation started (EGP)"] || "0";
+                    mappedRow["Facebook likes"] = rowObj["Facebook likes"] || "0";
+                    mappedRow["Instagram follows"] = rowObj["Instagram follows"] || "0";
+
+                    cleanData.push(mappedRow);
+                }
 
                 if (cleanData.length === 0) {
-                    statusDiv.innerText = "لم يتم العثور على بيانات صحيحة. تأكد أن الملف من فيسبوك أدز.";
+                    statusDiv.innerText = "❌ الملف لا يحتوي على بيانات أيام. تأكد أنك تصدر التقرير (By Day).";
                     statusDiv.style.color = "var(--danger-color)";
                     return;
                 }
@@ -325,7 +355,7 @@
                 uploadToSheet(clientCode, cleanData);
             },
             error: function(error) {
-                statusDiv.innerText = "خطأ في قراءة الملف: " + error.message;
+                statusDiv.innerText = "❌ خطأ في قراءة الملف: " + error.message;
                 statusDiv.style.color = "var(--danger-color)";
             }
         });
