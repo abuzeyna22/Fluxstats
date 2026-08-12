@@ -171,7 +171,7 @@
         } catch (e) { document.getElementById('clientLoginError').style.display = 'block'; }
     }
 
-        async function adminLogin() {
+    async function adminLogin() {
         const pin = document.getElementById('adminPinInput').value;
         document.getElementById('adminLoginError').style.display = 'none';
         try {
@@ -339,7 +339,7 @@
 
         const payload = {
             action: 'uploadData',
-                        pin: window.adminPin,
+            pin: window.adminPin, 
             clientCode: clientCode,
             rows: rows
         };
